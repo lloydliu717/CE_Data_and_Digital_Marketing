@@ -1,5 +1,4 @@
-
-  setwd("/Users/liuzichun/Documents/BU/2017SPRING/MA676/GSS_Data_Challenge")
+setwd("/Users/liuzichun/Documents/BU/2017SPRING/MA676/GSS_Data_Challenge")
 
 
 #
