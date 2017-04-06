@@ -1,0 +1,117 @@
+---
+title: "Association_Rules"
+author: "Zichun Liu"
+date: "4/3/2017"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(arules)
+library(arulesViz)
+library(datasets)
+```
+
+### import product matrix
+```{r}
+### Use grocery data
+product = read.csv("/Users/liuzichun/Documents/BU/2017SPRING/MA676/GSS_Data_Challenge/step2data/grocery.csv",header = T)
+product = product[-1,]
+rownames(product) = product$X
+product$X = NULL
+### set to be binary data
+product[product>0] = 1
+```
+
+### Aprior Algorithm
+
+```{r function}
+new_lines_adder = function(test.string, interval){
+  #length of str
+  string.length = nchar(test.string)
+  #split by N char intervals
+  split.starts = seq(1,string.length,interval)
+  split.ends = c(split.starts[-1]-1,nchar(test.string))
+  #split it
+  test.string = substring(test.string, split.starts, split.ends)
+  #put it back together with newlines
+  test.string = paste0(test.string,collapse = "\n")
+  return(test.string)
+}
+
+add_newlines = function(x, interval) {
+  if (class(x) == "data.frame" | class(x) == "matrix" | class(x) == "factor") {
+    x = as.vector(x)
+  }
+
+  if (length(x) == 1) {
+    return(new_lines_adder(x, interval))
+  } else {
+    t = sapply(x, FUN = new_lines_adder, interval = interval) #apply splitter to each
+    names(t) = NULL #remove names
+    return(t)
+  }
+}
+
+```
+
+```{r}
+###Lets explore the data before we make any rules:
+itemN = colSums(product)
+itemN = sort(itemN,decreasing = T)
+Top20 = itemN[1:20]
+Top20 = data.frame(item = names(Top20), frequency = Top20 )
+
+ggplot(Top20) + geom_bar(aes(x=reorder(item, -frequency),y=frequency),stat = "identity") + theme_light() + 
+  scale_x_discrete(labels = add_newlines(Top20$item, 35), name = "") + theme(axis.text.x = element_text(angle = 50, hjust = 1))
+```
+
+```{r build transaction object}
+tmp = product
+tmp[tmp == 0] = NA
+for(i in colnames(tmp)){
+  tmp[,i] = as.factor(tmp[,i])
+}
+
+tryconvert = as(object = tmp,Class = "transactions")
+#View(tryconvert@itemInfo)
+
+tryconvert@itemInfo$labels = tryconvert@itemInfo$variables
+
+barplot(sort(rowSums(tryconvert@data),decreasing = T)[1:20])
+
+#itemFrequencyPlot(tryconvert, topN = 20, type= "absolute")
+```
+
+```{r get the rules}
+#ptm = proc.time()
+rules = apriori(tryconvert, parameter = list(supp = 0.01, conf = 0.8, maxlen = 3))
+#proc.time() - ptm
+
+rules = sort(rules,by = "confidence", decreasing = T)
+```
+
+```{r}
+inspect(rules[1:11])
+```
+
+```{r}
+summary(rules)
+```
+
+```{r redundancies}
+# discuss
+sub.matrix = is.subset(rules, rules)
+sub.matrix[lower.tri(sub.matrix,diag = T)] = NA
+redundant = colSums(sub.matrix,na.rm = T) >= 1
+rules.pruned = rules[!redundant]
+summary(rules.pruned)
+```
+
+```{r}
+plot(rules)
+plot(rules[1:50], method = "graph",shading = NA)
+plot(rules[1:50], method = "graph",shading = NA,interactive = T)
+```
+
